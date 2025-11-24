@@ -63,15 +63,28 @@ const CuentasScreen = () => {
             setCuentaDetalle(res.data);
             setTotalPagado(res.data.totalPagado || 0);
             
-            if (defaultTipPercent > 0) {
-                const subtotal = res.data.cuenta.total;
-                const calcTip = (subtotal * (defaultTipPercent / 100)).toFixed(2);
+            // Calcular subtotal real de productos para base de cálculos
+            const subtotalProductos = res.data.items.reduce((acc, item) => acc + item.subtotal, 0);
+
+            // Si ya hay propina guardada en el backend, la respetamos
+            if (res.data.cuenta.propina > 0) {
+                setPropina(res.data.cuenta.propina.toString());
+            } 
+            // Si no hay propina y hay configuración por defecto
+            else if (defaultTipPercent > 0) {
+                const calcTip = (subtotalProductos * (defaultTipPercent / 100)).toFixed(2);
                 setPropina(calcTip);
             } else {
                 setPropina('');
             }
             
-            setDescuento('');
+            // Si ya hay descuento guardado
+            if (res.data.cuenta.descuento > 0) {
+                setDescuento(res.data.cuenta.descuento.toString());
+            } else {
+                setDescuento('');
+            }
+
             setMontoPagar('');
             setModalVisible(true);
         } catch (error) {
@@ -84,24 +97,30 @@ const CuentasScreen = () => {
 
     const applyTipPercentage = (percent) => {
         if (!cuentaDetalle) return;
-        const subtotal = cuentaDetalle.cuenta.total;
-        const calcTip = (subtotal * (percent / 100)).toFixed(2);
+        // Usar items para calcular base limpia
+        const subtotalProductos = cuentaDetalle.items.reduce((acc, item) => acc + item.subtotal, 0);
+        const calcTip = (subtotalProductos * (percent / 100)).toFixed(2);
         setPropina(calcTip);
     };
 
     const applyDiscountPercentage = (percent) => {
         if (!cuentaDetalle) return;
-        const subtotal = cuentaDetalle.cuenta.total;
-        const calcDesc = (subtotal * (percent / 100)).toFixed(2);
+        // Usar items para calcular base limpia
+        const subtotalProductos = cuentaDetalle.items.reduce((acc, item) => acc + item.subtotal, 0);
+        const calcDesc = (subtotalProductos * (percent / 100)).toFixed(2);
         setDescuento(calcDesc);
     };
 
     const calcularTotalFinal = () => {
         if (!cuentaDetalle) return 0;
-        const subtotal = cuentaDetalle.cuenta.total;
+        // Recalcular desde items para evitar duplicidad con el total que viene del backend
+        const subtotalProductos = cuentaDetalle.items.reduce((acc, item) => acc + item.subtotal, 0);
+        
         const prop = parseFloat(propina) || 0;
         const desc = parseFloat(descuento) || 0;
-        const total = Math.max(0, subtotal - desc) + prop;
+        
+        // Total = (Productos - Descuento) + Propina
+        const total = Math.max(0, subtotalProductos - desc) + prop;
         return total.toFixed(2);
     };
 
@@ -165,6 +184,9 @@ const CuentasScreen = () => {
     const printTicket = async () => {
         if (!cuentaDetalle) return;
 
+        // Calcular subtotal de productos para el ticket
+        const subtotalProductos = cuentaDetalle.items.reduce((acc, item) => acc + item.subtotal, 0);
+
         const html = `
             <html>
                 <head>
@@ -185,7 +207,7 @@ const CuentasScreen = () => {
                     <hr/>
                     <div style="display: flex; justify-content: space-between; font-weight: bold;">
                         <span>Subtotal:</span>
-                        <span>$${cuentaDetalle.cuenta.total.toFixed(2)}</span>
+                        <span>$${subtotalProductos.toFixed(2)}</span>
                     </div>
                     <div style="display: flex; justify-content: space-between;">
                         <span>Descuento:</span>
