@@ -11,12 +11,12 @@ export const AuthProvider = ({ children }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [socket, setSocket] = useState(null);
 
-    // Inicializar Socket
+    // Inicializar Socket.io para comunicación en tiempo real
     useEffect(() => {
-        // Conectar al socket
+        // Conectar al socket del backend
         // Nota: En producción, usar la URL de tu servidor real
         // Usar la misma IP que en axios.js
-        const newSocket = io('http://192.168.1.75:3001'); 
+        const newSocket = io('http://192.168.137.125:3001'); 
         setSocket(newSocket);
 
         return () => newSocket.close();
@@ -42,13 +42,15 @@ export const AuthProvider = ({ children }) => {
         };
     }, [socket, user]);
 
+    // Función de inicio de sesión
     const login = async (email, password) => {
         setIsLoading(true);
         try {
-            // Conexión con endpoint real
+            // Conexión con endpoint real de autenticación
             const response = await api.post('/auth/login', { email, password });
             const { token, user } = response.data;
             
+            // Guardar token y usuario en almacenamiento local para persistencia
             await AsyncStorage.setItem('token', token);
             await AsyncStorage.setItem('user', JSON.stringify(user));
             setUser(user);

@@ -55,6 +55,7 @@ const CuentasScreen = () => {
         if (tip) setDefaultTipPercent(parseFloat(tip));
     };
 
+    // Carga los detalles de la cuenta de una mesa seleccionada
     const handleSelectMesa = async (mesa) => {
         setSelectedMesa(mesa);
         setLoading(true);
@@ -64,13 +65,14 @@ const CuentasScreen = () => {
             setTotalPagado(res.data.totalPagado || 0);
             
             // Calcular subtotal real de productos para base de cálculos
+            // Se suman los subtotales individuales de cada item
             const subtotalProductos = res.data.items.reduce((acc, item) => acc + item.subtotal, 0);
 
-            // Si ya hay propina guardada en el backend, la respetamos
+            // Si ya hay propina guardada en el backend (de una sesión anterior), la respetamos
             if (res.data.cuenta.propina > 0) {
                 setPropina(res.data.cuenta.propina.toString());
             } 
-            // Si no hay propina y hay configuración por defecto
+            // Si no hay propina y hay configuración por defecto, calculamos el % inicial
             else if (defaultTipPercent > 0) {
                 const calcTip = (subtotalProductos * (defaultTipPercent / 100)).toFixed(2);
                 setPropina(calcTip);
@@ -78,7 +80,7 @@ const CuentasScreen = () => {
                 setPropina('');
             }
             
-            // Si ya hay descuento guardado
+            // Si ya hay descuento guardado, lo recuperamos
             if (res.data.cuenta.descuento > 0) {
                 setDescuento(res.data.cuenta.descuento.toString());
             } else {
@@ -95,9 +97,10 @@ const CuentasScreen = () => {
         }
     };
 
+    // Aplica un porcentaje de propina sobre el subtotal de productos
     const applyTipPercentage = (percent) => {
         if (!cuentaDetalle) return;
-        // Usar items para calcular base limpia
+        // Usar items para calcular base limpia, evitando sumar propinas anteriores
         const subtotalProductos = cuentaDetalle.items.reduce((acc, item) => acc + item.subtotal, 0);
         const calcTip = (subtotalProductos * (percent / 100)).toFixed(2);
         setPropina(calcTip);
@@ -111,6 +114,8 @@ const CuentasScreen = () => {
         setDescuento(calcDesc);
     };
 
+    // Calcula el total final a pagar
+    // Fórmula: (Subtotal Productos - Descuento) + Propina
     const calcularTotalFinal = () => {
         if (!cuentaDetalle) return 0;
         // Recalcular desde items para evitar duplicidad con el total que viene del backend
@@ -119,23 +124,25 @@ const CuentasScreen = () => {
         const prop = parseFloat(propina) || 0;
         const desc = parseFloat(descuento) || 0;
         
-        // Total = (Productos - Descuento) + Propina
         const total = Math.max(0, subtotalProductos - desc) + prop;
         return total.toFixed(2);
     };
 
+    // Calcula cuánto falta por pagar (Total Final - Lo que ya se ha pagado)
     const calcularRestante = () => {
         const total = parseFloat(calcularTotalFinal());
         const pagado = parseFloat(totalPagado) || 0;
         return Math.max(0, total - pagado).toFixed(2);
     };
 
+    // Envía la transacción de pago al backend
     const handleProcesarPago = async () => {
         if (!selectedMesa) return;
         
         const restante = parseFloat(calcularRestante());
         const monto = parseFloat(montoPagar) || restante;
 
+        // Determina si es cierre total o pago parcial
         const esPagoTotal = monto >= restante;
         const actionText = esPagoTotal ? 'Cerrar Cuenta' : 'Registrar Pago Parcial';
 
@@ -161,6 +168,7 @@ const CuentasScreen = () => {
                                 fetchMesasOcupadas();
                             } else {
                                 Alert.alert('Pago Parcial', `Pago registrado. Restante: $${res.data.restante.toFixed(2)}`);
+                                // Recargar datos para actualizar 'totalPagado' y 'restante'
                                 handleSelectMesa(selectedMesa);
                             }
                         } catch (error) {
